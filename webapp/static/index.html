@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TAGT Flare Predictor</title>
+  <meta name="description" content="Capstone project: predicting Systemic Lupus Erythematosus flares with a Temporal Attention Graph Transformer.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#overview">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="9" r="3.2"/><circle cx="24" cy="8" r="3.2"/><circle cx="16" cy="23" r="3.2"/><path d="M8 9 24 8 16 23Z" fill="none" stroke-width="1.6"/></svg>
+        <span>TAGT <em>Flare Predictor</em></span>
+      </a>
+      <nav class="tabs" aria-label="Sections">
+        <a href="#overview" data-tab="overview">Overview</a>
+        <a href="#predict" data-tab="predict">Predict</a>
+        <a href="#results" data-tab="results">Results</a>
+        <a href="#method" data-tab="method">Methodology</a>
+        <a href="#team" data-tab="team">Team</a>
+      </nav>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">◐</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- ============ OVERVIEW ============ -->
+    <section id="overview" class="panel" data-panel="overview">
+      <div class="hero">
+        <p class="eyebrow">University Capstone Project</p>
+        <h1>Predicting lupus flares from blood gene expression and clinical activity</h1>
+        <p class="lede">Systemic Lupus Erythematosus (SLE) is an autoimmune disease that alternates between quiet periods and <strong>flares</strong>, episodes of increased disease activity that can damage organs. This project uses a <strong>Temporal Attention Graph Transformer (TAGT)</strong> to estimate the chance that a patient flares at their <em>next</em> visit, from 1,000 whole-blood gene-expression probes plus their current SLEDAI-2K activity score.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#predict">Try a prediction</a>
+          <a class="btn" href="#results">See validated results</a>
+        </div>
+      </div>
+
+      <div class="stats" id="datasetStats" aria-live="polite"></div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>1 · Gene encoder</h3>
+          <p>1,000 Illumina probes, standardised per probe, are compressed into a 128-dimensional molecular signature. Heavy input dropout keeps the network from memorising noise.</p>
+        </article>
+        <article class="card">
+          <h3>2 · Graph + attention</h3>
+          <p>A graph projection mixes the gene signature, and multi-head attention (8 heads) re-weights it, following the TAGT layout of the original research code.</p>
+        </article>
+        <article class="card">
+          <h3>3 · Clinical fusion</h3>
+          <p>The current SLEDAI-2K score and flare status are encoded and fused with the molecular signature. A classifier then outputs the probability of a flare at the next visit.</p>
+        </article>
+      </div>
+
+      <div class="notice">
+        <strong>Research prototype.</strong> Trained on a semi-synthetic dataset (real GSE49454 expression profiles + simulated clinical visits). This tool is for education and research only. It is not a medical device and must not be used to make clinical decisions.
+      </div>
+    </section>
+
+    <!-- ============ PREDICT ============ -->
+    <section id="predict" class="panel" data-panel="predict" hidden>
+      <h2>Flare risk prediction</h2>
+      <p class="muted">Choose a visit from the project dataset, or enter a custom patient profile.</p>
+
+      <div class="predict-layout">
+        <div class="card form-card">
+          <div class="seg" role="tablist" aria-label="Input mode">
+            <button type="button" role="tab" class="seg-btn active" data-mode="sample" aria-selected="true">Cohort sample</button>
+            <button type="button" role="tab" class="seg-btn" data-mode="custom" aria-selected="false">Custom patient</button>
+          </div>
+
+          <form id="sampleForm" class="mode" data-mode-panel="sample">
+            <label for="sampleSelect">Patient visit</label>
+            <select id="sampleSelect"></select>
+            <p class="hint" id="sampleMeta"></p>
+            <div class="row">
+              <button type="button" class="btn ghost" id="randomSample">Random visit</button>
+              <button type="submit" class="btn primary">Predict</button>
+            </div>
+          </form>
+
+          <form id="customForm" class="mode" data-mode-panel="custom" hidden>
+            <label for="sledai">Current SLEDAI-2K score: <output id="sledaiOut">6</output></label>
+            <input type="range" id="sledai" min="0" max="30" step="1" value="6">
+            <p class="hint">0 = no activity · 1–5 mild · 6–10 moderate · 11–19 high · 20+ very high</p>
+
+            <fieldset class="toggle-row">
+              <legend>Flaring at the current visit?</legend>
+              <label><input type="radio" name="flareNow" value="0" checked> No</label>
+              <label><input type="radio" name="flareNow" value="1"> Yes</label>
+            </fieldset>
+
+            <label for="exprFile">Gene expression (optional CSV)</label>
+            <input type="file" id="exprFile" accept=".csv,text/csv">
+            <p class="hint">Two columns: <code>probe_id,expression</code> (log₂ Illumina values). Missing probes use the cohort mean. <a href="/api/template.csv">Download template</a></p>
+            <p class="hint" id="fileStatus"></p>
+            <div class="row">
+              <button type="submit" class="btn primary">Predict</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card result-card" id="resultCard" aria-live="polite">
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p>Run a prediction to see the flare risk, the comparison with the clinical baseline, and the genes that drove the TAGT output.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="explainCard" hidden>
+        <div class="card-head">
+          <h3>Why did TAGT predict this? Top 10 probe contributions</h3>
+          <div class="legend">
+            <span><i class="sw sw-up"></i>Raises flare risk</span>
+            <span><i class="sw sw-down"></i>Lowers flare risk</span>
+          </div>
+        </div>
+        <p class="muted small">Gradient × input attribution on the standardised expression profile: how much each probe moved the model's flare score for this patient.</p>
+        <div id="explainChart" class="chart"></div>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section id="results" class="panel" data-panel="results" hidden>
+      <h2>Validated results</h2>
+      <p class="muted" id="protocolText"></p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h3>ROC curves (out-of-fold)</h3>
+            <div class="legend" id="rocLegend"></div>
+          </div>
+          <div id="rocChart" class="chart"></div>
+        </div>
+        <div class="card">
+          <h3>AUC-ROC by model</h3>
+          <p class="muted small">Pooled out-of-fold AUC; whiskers show ± 1 SD across the 5 folds. The dashed line at 0.5 is chance.</p>
+          <div id="aucChart" class="chart"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Full metrics</h3>
+        <div class="table-wrap">
+          <table id="metricsTable">
+            <thead><tr><th>Model</th><th>AUC-ROC</th><th>Fold AUC (mean ± SD)</th><th>Accuracy</th><th>Sensitivity</th><th>Specificity</th><th>F1</th><th>Threshold</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted small">Classification metrics use each model's Youden-optimal threshold, chosen on the out-of-fold predictions.</p>
+      </div>
+
+      <div class="card findings">
+        <h3>Key findings</h3>
+        <ul id="findings"></ul>
+      </div>
+    </section>
+
+    <!-- ============ METHOD ============ -->
+    <section id="method" class="panel" data-panel="method" hidden>
+      <h2>Methodology</h2>
+      <div class="grid-2">
+        <div class="card prose">
+          <h3>Dataset</h3>
+          <p>The dataset is <strong>semi-synthetic</strong>. Gene-expression profiles are real whole-blood transcriptomes from <strong>GSE49454</strong> (NCBI GEO, Illumina HumanHT-12; 1,000 probes kept). The longitudinal clinical part is <em>simulated</em> by the repository's preprocessing script: patient visit histories, SLEDAI-2K scores and flare labels. Each simulated visit is given a randomly chosen real expression profile. This gives <span data-k="n_samples"></span> consecutive-visit pairs from <span data-k="n_patients"></span> simulated patients. The target is <em>whether a flare occurs at the next visit</em>; the flare rate is <span data-k="flare_rate"></span>.</p>
+          <h3>Inputs</h3>
+          <ul>
+            <li>Gene expression at the current visit (1,000 probes, z-scored using training-fold statistics only)</li>
+            <li>Current SLEDAI-2K score (scaled ÷ 20)</li>
+            <li>Current flare status (0 / 1)</li>
+          </ul>
+          <h3>Training</h3>
+          <p>AdamW (lr 1e-3, weight decay 0.05), 15 epochs, batch size 32, class-balanced BCE loss, Gaussian-noise augmentation (σ = 0.1), input dropout 0.7 and gradient clipping at 1.0.</p>
+        </div>
+        <div class="card prose">
+          <h3>Validation protocol</h3>
+          <p>We use <strong>patient-grouped stratified 5-fold cross-validation</strong>. All visits from the same patient stay in the same fold, so the model is always tested on <em>unseen patients</em>. Without grouping, visits from the same person leak between training and test sets and inflate the scores.</p>
+          <h3>Baselines</h3>
+          <ul>
+            <li>Logistic regression on clinical features only</li>
+            <li>L2-regularised logistic regression on genes + clinical</li>
+            <li>Random forest (300 trees) on genes + clinical</li>
+          </ul>
+          <h3>Limitations</h3>
+          <ul>
+            <li>Clinical trajectories are simulated and expression profiles are assigned to visits at random, so the genes carry almost no real flare signal. Results demonstrate the pipeline, not clinical validity.</li>
+            <li>Small cohort (100 patients, ~380 visit pairs), so fold-to-fold variance is high.</li>
+            <li>The shipped checkpoint <code>models/best_tagt_model.pt</code> produced near-constant outputs (AUC ≈ 0.50) on this data, so the model was retrained from scratch for this app.</li>
+            <li>Earlier documents in the repository report AUC 0.94. That figure could not be reproduced under leakage-free evaluation.</li>
+            <li>There is no external validation cohort, and no prospective or clinical validation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TEAM ============ -->
+    <section id="team" class="panel" data-panel="team" hidden>
+      <h2>Project team</h2>
+      <p class="muted">Capstone project: <em>SLE Flare Prediction with a Temporal Attention Graph Transformer (TAGT)</em></p>
+      <div class="team-grid" id="teamGrid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>TAGT Flare Predictor · University Capstone Project</span>
+      <span class="muted" id="footerTeam"></span>
+    </div>
+  </footer>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
